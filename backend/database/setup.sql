@@ -3,7 +3,7 @@
 
 -- 1. First, create the database (if not exists)
 -- Note: You might need to run this command separately
-CREATE DATABASE excel_query_db;
+CREATE DATABASE excel_query_db_606r;
 
 -- 2. Connect to the excel_query_db database and run the following:
 
