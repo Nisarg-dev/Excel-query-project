@@ -215,8 +215,8 @@ export default function App(): React.ReactNode {
           <p className="mt-2 text-lg text-gray-400">Upload, analyze, and export your spreadsheet data with ease.</p>
         </header>
 
-        {/* Tab Navigation - Hidden Upload Tab */}
-        <div className="mb-8" style={{ display: 'none' }}>
+        {/* Tab Navigation - Upload Tab Enabled */}
+        <div className="mb-8">
           <div className="border-b border-gray-700">
             <nav className="-mb-px flex space-x-8">
               <button
@@ -243,8 +243,100 @@ export default function App(): React.ReactNode {
           </div>
         </div>
 
-        {/* Tab Content - Always show Search */}
-        <SearchComponent />
+        {/* Tab Content - Show Both Tabs */}
+        {activeTab === 'search' ? (
+          <SearchComponent />
+        ) : (
+          <div>
+            {isLoadingExisting ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-400 mx-auto mb-4"></div>
+                <p className="text-gray-400">Checking for existing data...</p>
+                <p className="text-sm text-gray-500 mt-2">Loading your last uploaded file if available</p>
+              </div>
+            ) : !excelData ? (
+              <div>
+                <FileUpload onFileUpload={handleFileUpload} isProcessing={isProcessing} error={error} />
+                <div className="mt-6 text-center">
+                  <p className="text-sm text-gray-500">
+                    💡 Tip: If you've uploaded files before, they'll automatically load on page refresh
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {autoLoadedFile && (
+                  <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4 mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-green-400 font-medium">Welcome back!</p>
+                        <p className="text-green-300/80 text-sm">Automatically loaded your last uploaded file: {fileName}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="bg-gray-800/50 rounded-lg p-6 border border-gray-700">
+                  <div className="flex flex-wrap justify-between items-center gap-4">
+                     <div className="flex items-center gap-3">
+                        <FileIcon className="w-6 h-6 text-indigo-400" />
+                        <div>
+                          <span className="font-medium text-lg">{fileName}</span>
+                          <p className="text-sm text-gray-400">
+                            {excelData.sheetNames.length} sheets • {Object.values(excelData.data).reduce((total: number, rows) => total + (Array.isArray(rows) ? rows.length : 0), 0)} total rows
+                          </p>
+                        </div>
+                     </div>
+                     <div className="flex items-center gap-4">
+                       <button
+                         onClick={handleExportToCSV}
+                         disabled={sortedData.length === 0}
+                         className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed text-sm font-semibold"
+                       >
+                         <DownloadIcon className="w-4 h-4" />
+                         Export CSV
+                       </button>
+                       <button 
+                         onClick={handleReset} 
+                         className="px-4 py-2 bg-red-600/80 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-semibold"
+                       >
+                         Upload New File
+                       </button>
+                     </div>
+                  </div>
+                </div>
+
+                <QueryControls
+                  sheets={excelData.sheetNames}
+                  selectedSheet={selectedSheet}
+                  onSheetChange={setSelectedSheet}
+                  columns={columns}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                />
+
+                <DataTable
+                  data={paginatedData}
+                  columns={columns}
+                  onSort={handleSort}
+                  sortConfig={sortConfig}
+                />
+                
+                {totalPages > 1 && (
+                    <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    />
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </main>
       <footer className="text-center p-4 text-gray-500 text-sm">
         <p>Built with React & TypeScript. Data stored in PostgreSQL. Auto-loads your last uploaded file.</p>
