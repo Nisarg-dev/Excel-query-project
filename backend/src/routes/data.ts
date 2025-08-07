@@ -441,6 +441,7 @@ router.get('/search', async (req, res) => {
     const searchQuery = `
       SELECT DISTINCT
         s.sheet_name,
+        s.headers,
         f.original_name as file_name,
         ed.row_number,
         ed.data,
@@ -480,6 +481,7 @@ router.get('/search', async (req, res) => {
           file_name: row.file_name,
           annexure: row.annexure || '',
           title: row.title || '',
+          headers: row.headers, // Include original column order
           total_matches: 0,
           records: [],
           recordKeys: new Set() // Track unique records

@@ -14,6 +14,7 @@ interface SheetResult {
   file_name: string;
   annexure: string;
   title: string;
+  headers: string[]; // Add headers to preserve column order
   total_matches: number;
   records: Array<{ row_number: number; data: any; date_value?: string; rc_value?: string }>;
   expanded?: boolean;
@@ -444,11 +445,8 @@ const SearchComponent: React.FC = () => {
                         <thead className="bg-gray-700/50">
                           <tr>
                             {result.records.length > 0 && (() => {
-                              const allColumns = Object.keys(result.records[0].data || {});
-                              // Put Annexure first, then all other columns
-                              const orderedColumns = allColumns.includes('Annexure') 
-                                ? ['Annexure', ...allColumns.filter(col => col !== 'Annexure')]
-                                : allColumns;
+                              // Use the original column order from the Excel file
+                              const orderedColumns = result.headers || Object.keys(result.records[0].data || {});
                               
                               return orderedColumns.map((columnName, index) => (
                                 <th key={index} className="px-4 py-2 text-left text-sm font-medium text-gray-300 border-b border-gray-600 min-w-[150px] max-w-[300px]">
@@ -460,16 +458,14 @@ const SearchComponent: React.FC = () => {
                         </thead>
                         <tbody>
                           {result.records.map((record, recordIndex) => {
-                            // Get all available columns and put Annexure first
-                            const allColumns = Object.keys(record.data || {});
-                            const orderedColumns = allColumns.includes('Annexure') 
-                              ? ['Annexure', ...allColumns.filter(col => col !== 'Annexure')]
-                              : allColumns;
+                            // Use the original column order from the Excel file
+                            const orderedColumns = result.headers || Object.keys(record.data || {});
                             
                             // Debug: Log record structure to see what's available
                             if (recordIndex === 0) {
                               console.log('Record structure:', record);
                               console.log('Available data fields:', Object.keys(record.data || {}));
+                              console.log('Original column order:', result.headers);
                               console.log('date_value:', record.date_value);
                               console.log('RC Number value:', record.data['RC Number']);
                             }

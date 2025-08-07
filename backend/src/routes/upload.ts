@@ -66,17 +66,22 @@ router.post('/', upload.single('excelFile'), async (req, res) => {
       data: {}
     };
 
-    // Process each sheet
+    // Process each sheet and store header order
+    const sheetHeaders: Record<string, string[]> = {};
+    
     for (const sheetName of sheetNames) {
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
       
       if (jsonData.length < 1) {
         parsedData.data[sheetName] = [];
+        sheetHeaders[sheetName] = [];
         continue;
       }
 
       const headers = jsonData[0] as string[];
+      sheetHeaders[sheetName] = headers; // Store original header order
+      
       const rows = (jsonData.slice(1) as any[][]).map(rowArray => {
         const row: ExcelRow = {};
         headers.forEach((header, index) => {
@@ -105,7 +110,7 @@ router.post('/', upload.single('excelFile'), async (req, res) => {
       for (const sheetName of sheetNames) {
         const sheetResult = await client.query(
           'INSERT INTO excel_sheets (file_id, sheet_name, headers, row_count) VALUES ($1, $2, $3, $4) RETURNING id',
-          [fileId, sheetName, JSON.stringify(Object.keys(parsedData.data[sheetName][0] || {})), parsedData.data[sheetName].length]
+          [fileId, sheetName, JSON.stringify(sheetHeaders[sheetName]), parsedData.data[sheetName].length]
         );
         const sheetId = sheetResult.rows[0].id;
 
