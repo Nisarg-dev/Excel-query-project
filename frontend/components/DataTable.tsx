@@ -2,15 +2,17 @@
 import React from 'react';
 import { Row, SortConfig } from '../types';
 import { ArrowUpIcon, ArrowDownIcon } from './icons';
+import { formatRcWithDate } from '../utils/rcFormatter';
 
 interface DataTableProps {
   data: Row[];
   columns: string[];
   sortConfig: SortConfig | null;
   onSort: (key: string) => void;
+  rcDatesMap?: { [key: string]: string };
 }
 
-const DataTable: React.FC<DataTableProps> = ({ data, columns, sortConfig, onSort }) => {
+const DataTable: React.FC<DataTableProps> = ({ data, columns, sortConfig, onSort, rcDatesMap = {} }) => {
   if (data.length === 0) {
     return (
       <div className="bg-gray-800/50 rounded-lg p-8 border border-gray-700 text-center">
@@ -20,14 +22,18 @@ const DataTable: React.FC<DataTableProps> = ({ data, columns, sortConfig, onSort
     );
   }
 
-  const renderCell = (value: any) => {
+  const renderCell = (value: any, columnName: string, rowData?: Row) => {
     if (value === null || value === undefined) {
       return <span className="text-gray-500 italic">null</span>;
     }
     if (typeof value === 'boolean') {
       return value ? 'True' : 'False';
     }
-    return String(value);
+    
+    // Use the utility function to format RC numbers with dates
+    const formattedValue = formatRcWithDate(value, columnName, rcDatesMap, { data: rowData });
+    
+    return formattedValue;
   };
 
   return (
@@ -61,7 +67,7 @@ const DataTable: React.FC<DataTableProps> = ({ data, columns, sortConfig, onSort
                     <tr key={rowIndex} className="hover:bg-gray-700/50 transition-colors">
                     {columns.map(col => (
                         <td key={`${rowIndex}-${col}`} className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        {renderCell(row[col])}
+                        {renderCell(row[col], col, row)}
                         </td>
                     ))}
                     </tr>

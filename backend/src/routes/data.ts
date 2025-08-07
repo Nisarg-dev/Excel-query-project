@@ -306,11 +306,14 @@ router.get('/search', async (req, res) => {
       
       const rcLookupQuery = `
         SELECT DISTINCT
-          data->>'rc_number' as rc_number,
-          data->>'rc' as rc,
-          data->>'rc_no' as rc_no,
-          data->>'reference_number' as reference_number,
-          data->>'RC_Number' as RC_Number
+          COALESCE(
+            data->>'rc_number', 
+            data->>'rc', 
+            data->>'rc_no', 
+            data->>'reference_number',
+            data->>'RC_Number'
+          ) as rc_number,
+          data->>'Meeting_held_on_date' as meeting_date
         FROM excel_data ed
         JOIN excel_sheets s ON s.id = ed.sheet_id
         WHERE (LOWER(s.sheet_name) LIKE '%list%rc%' 
@@ -334,12 +337,22 @@ router.get('/search', async (req, res) => {
         const rcResult = await pool.query(rcLookupQuery, dateParams);
         console.log(`📊 RC Lookup returned ${rcResult.rows.length} rows`);
         
+        // Create a map of RC numbers to their meeting dates
+        const rcDateMap = new Map();
         rcNumbers = rcResult.rows
-          .map(row => row.rc_number || row.rc || row.rc_no || row.reference_number || row.RC_Number)
+          .map(row => {
+            const rcNum = row.rc_number;
+            const meetingDate = row.meeting_date;
+            if (rcNum && meetingDate) {
+              rcDateMap.set(rcNum.toString().trim(), meetingDate);
+            }
+            return rcNum;
+          })
           .filter(rc => rc && rc.toString().trim() !== '')
           .map(rc => rc.toString().trim());
         
         console.log(`📋 Found ${rcNumbers.length} RC numbers for date range ${dateFrom || 'start'} to ${dateTo || 'end'}:`, rcNumbers);
+        console.log(`📅 RC Date mapping:`, Object.fromEntries(rcDateMap));
         
         if (rcNumbers.length === 0) {
           console.log('⚠️ No RC numbers found in date range, returning empty results');
@@ -734,6 +747,58 @@ router.delete('/files/:fileId', async (req, res) => {
   } catch (error) {
     console.error('❌ Error deleting file:', error);
     res.status(500).json({ error: 'Failed to delete file' });
+  }
+});
+
+// GET /api/data/rc-dates - Get RC numbers with their meeting dates from List_of_RC sheet
+router.get('/rc-dates', async (req, res) => {
+  try {
+    console.log('🔍 Fetching RC numbers with meeting dates from List_of_RC sheet...');
+    
+    const rcDateQuery = `
+      SELECT DISTINCT
+        COALESCE(
+          data->>'rc_number', 
+          data->>'rc', 
+          data->>'rc_no', 
+          data->>'reference_number',
+          data->>'RC_Number'
+        ) as rc_number,
+        data->>'Meeting_held_on_date' as meeting_date
+      FROM excel_data ed
+      JOIN excel_sheets s ON s.id = ed.sheet_id
+      WHERE (LOWER(s.sheet_name) LIKE '%list%rc%' 
+        OR LOWER(s.sheet_name) LIKE '%rc%list%'
+        OR LOWER(s.sheet_name) = 'list of rc'
+        OR LOWER(s.sheet_name) = 'list_of_rc')
+        AND (
+          data->>'rc_number' IS NOT NULL OR
+          data->>'rc' IS NOT NULL OR
+          data->>'rc_no' IS NOT NULL OR
+          data->>'reference_number' IS NOT NULL OR
+          data->>'RC_Number' IS NOT NULL
+        )
+        AND data->>'Meeting_held_on_date' IS NOT NULL
+      ORDER BY rc_number
+    `;
+
+    const result = await pool.query(rcDateQuery);
+    
+    // Create a mapping object
+    const rcDateMapping: { [key: string]: string } = {};
+    result.rows.forEach(row => {
+      if (row.rc_number && row.meeting_date) {
+        rcDateMapping[row.rc_number.toString().trim()] = row.meeting_date;
+      }
+    });
+
+    console.log(`📅 Found ${Object.keys(rcDateMapping).length} RC numbers with meeting dates`);
+    
+    res.json(rcDateMapping);
+
+  } catch (error) {
+    console.error('❌ Error fetching RC dates:', error);
+    res.status(500).json({ error: 'Failed to fetch RC dates' });
   }
 });
 

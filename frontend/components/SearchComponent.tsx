@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { searchSheets, getCompanySuggestions, getProductSuggestions } from '../services/mockApi';
+import { searchSheets, getCompanySuggestions, getProductSuggestions, getRcDates } from '../services/mockApi';
 import { Row } from '../types';
+import { formatRcWithDate } from '../utils/rcFormatter';
 
 interface SearchFilters {
   company: string;
@@ -58,6 +59,24 @@ const SearchComponent: React.FC = () => {
   // Modal states for long text
   const [modalContent, setModalContent] = useState<{ title: string; content: string } | null>(null);
   const [showModal, setShowModal] = useState(false);
+
+  // RC dates mapping from List_of_RC sheet
+  const [rcDatesMap, setRcDatesMap] = useState<{ [key: string]: string }>({});
+
+  // Load RC dates mapping on component mount
+  useEffect(() => {
+    const loadRcDates = async () => {
+      try {
+        const rcDates = await getRcDates();
+        setRcDatesMap(rcDates);
+        console.log('📅 Loaded RC dates mapping:', rcDates);
+      } catch (error) {
+        console.error('❌ Failed to load RC dates:', error);
+      }
+    };
+
+    loadRcDates();
+  }, []);
 
   // Debounced suggestion fetching
   useEffect(() => {
@@ -247,7 +266,7 @@ const SearchComponent: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div className="relative">
             <label htmlFor="company" className="block text-sm font-medium text-gray-300 mb-2">
-              Company Name (keyword search)
+              Company Name
             </label>
             <div ref={companyInputRef}>
               <input
@@ -257,7 +276,7 @@ const SearchComponent: React.FC = () => {
                 onChange={(e) => handleInputChange('company', e.target.value)}
                 onKeyPress={handleKeyPress}
                 onFocus={() => filters.company.length >= 1 && companySuggestions.length > 0 && setShowCompanySuggestions(true)}
-                placeholder="Enter company keyword..."
+                placeholder="Enter company name..."
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-200 placeholder-gray-400"
                 autoComplete="off"
               />
@@ -278,7 +297,7 @@ const SearchComponent: React.FC = () => {
           </div>
           <div className="relative">
             <label htmlFor="product" className="block text-sm font-medium text-gray-300 mb-2">
-              Product (keyword search)
+              Product Name
             </label>
             <div ref={productInputRef}>
               <input
@@ -341,7 +360,7 @@ const SearchComponent: React.FC = () => {
               disabled={isSearching}
               className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-medium py-2 px-6 rounded-md transition-colors"
             >
-              {isSearching ? 'Searching All Sheets...' : 'Search All Records'}
+              {isSearching ? 'Searching All Sheets...' : 'Click to Search'}
             </button>
             <button
               onClick={handleReset}
@@ -405,9 +424,7 @@ const SearchComponent: React.FC = () => {
       {/* Search Results */}
       {searchResults && searchResults.results.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-200 mb-4">
-            All Matching Records by Sheet
-          </h2>
+          
           {searchResults.results.map((result, index) => (
             <div key={`${result.sheet_name}-${index}`} className="border border-gray-700 rounded-lg overflow-hidden bg-gray-800/30">
               {/* Sheet Card Header */}
@@ -445,31 +462,54 @@ const SearchComponent: React.FC = () => {
                       <table className="min-w-full bg-gray-800/30 border border-gray-700 rounded-md table-fixed">
                         <thead className="bg-gray-700/50">
                           <tr>
-                            <th className="w-20 px-4 py-2 text-left text-sm font-medium text-gray-300 border-b border-gray-600">Row #</th>
-                            <th className="w-32 px-4 py-2 text-left text-sm font-medium text-gray-300 border-b border-gray-600">Date</th>
-                            {result.records[0]?.data && Object.keys(result.records[0].data).map((header) => (
-                              <th key={header} className="px-4 py-2 text-left text-sm font-medium text-gray-300 border-b border-gray-600 min-w-[150px] max-w-[300px]">
-                                {header}
-                              </th>
-                            ))}
+                            {result.records.length > 0 && (() => {
+                              const allColumns = Object.keys(result.records[0].data || {});
+                              // Put Annexure first, then all other columns
+                              const orderedColumns = allColumns.includes('Annexure') 
+                                ? ['Annexure', ...allColumns.filter(col => col !== 'Annexure')]
+                                : allColumns;
+                              
+                              return orderedColumns.map((columnName, index) => (
+                                <th key={index} className="px-4 py-2 text-left text-sm font-medium text-gray-300 border-b border-gray-600 min-w-[150px] max-w-[300px]">
+                                  {columnName}
+                                </th>
+                              ));
+                            })()}
                           </tr>
                         </thead>
                         <tbody>
-                          {result.records.map((record, recordIndex) => (
-                            <tr key={recordIndex} className={recordIndex % 2 === 0 ? 'bg-gray-800/20' : 'bg-gray-800/40'}>
-                              <td className="w-20 px-4 py-2 text-sm text-gray-200 border-b border-gray-700 font-medium">
-                                {record.row_number}
-                              </td>
-                              <td className="w-32 px-4 py-2 text-sm text-gray-200 border-b border-gray-700 font-medium">
-                                {record.date_value || '-'}
-                              </td>
-                              {Object.entries(record.data).map(([header, value], cellIndex) => (
-                                <td key={cellIndex} className="px-4 py-2 text-sm text-gray-200 border-b border-gray-700 min-w-[150px] max-w-[300px]">
-                                  {renderCellContent(value, header)}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
+                          {result.records.map((record, recordIndex) => {
+                            // Get all available columns and put Annexure first
+                            const allColumns = Object.keys(record.data || {});
+                            const orderedColumns = allColumns.includes('Annexure') 
+                              ? ['Annexure', ...allColumns.filter(col => col !== 'Annexure')]
+                              : allColumns;
+                            
+                            // Debug: Log record structure to see what's available
+                            if (recordIndex === 0) {
+                              console.log('Record structure:', record);
+                              console.log('Available data fields:', Object.keys(record.data || {}));
+                              console.log('date_value:', record.date_value);
+                              console.log('RC Number value:', record.data['RC Number']);
+                            }
+                            
+                            return (
+                              <tr key={recordIndex} className={recordIndex % 2 === 0 ? 'bg-gray-800/20' : 'bg-gray-800/40'}>
+                                {orderedColumns.map((columnName, cellIndex) => {
+                                  const cellValue = record.data[columnName] || '';
+                                  
+                                  // Use the utility function to format RC numbers with dates
+                                  const formattedValue = formatRcWithDate(cellValue, columnName, rcDatesMap, record);
+                                  
+                                  return (
+                                    <td key={cellIndex} className="px-4 py-2 text-sm text-gray-200 border-b border-gray-700 min-w-[150px] max-w-[300px]">
+                                      {renderCellContent(formattedValue, columnName)}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

@@ -184,7 +184,21 @@ export const loadExistingData = async (fileId: number): Promise<ExcelData> => {
   }
 };
 
-export const uploadAndParseExcel = (file: File): Promise<ExcelData> => {
+// Get RC numbers with their meeting dates from List_of_RC sheet
+export const getRcDates = async (): Promise<{ [key: string]: string }> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/data/rc-dates`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching RC dates:', error);
+    throw error;
+  }
+};
+
+export const uploadExcelFile = (file: File): Promise<ExcelData> => {
   return new Promise(async (resolve, reject) => {
     try {
       const formData = new FormData();
