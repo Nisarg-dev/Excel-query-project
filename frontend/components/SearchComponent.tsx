@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { searchSheets, getCompanySuggestions, getProductSuggestions, getRcDates } from '../services/mockApi';
+import { searchSheets, getCompanySuggestions, getProductSuggestions } from '../services/mockApi';
 import { Row } from '../types';
-import { formatRcWithDate } from '../utils/rcFormatter';
 
 interface SearchFilters {
   company: string;
@@ -59,24 +58,6 @@ const SearchComponent: React.FC = () => {
   // Modal states for long text
   const [modalContent, setModalContent] = useState<{ title: string; content: string } | null>(null);
   const [showModal, setShowModal] = useState(false);
-
-  // RC dates mapping from List_of_RC sheet
-  const [rcDatesMap, setRcDatesMap] = useState<{ [key: string]: string }>({});
-
-  // Load RC dates mapping on component mount
-  useEffect(() => {
-    const loadRcDates = async () => {
-      try {
-        const rcDates = await getRcDates();
-        setRcDatesMap(rcDates);
-        console.log('📅 Loaded RC dates mapping:', rcDates);
-      } catch (error) {
-        console.error('❌ Failed to load RC dates:', error);
-      }
-    };
-
-    loadRcDates();
-  }, []);
 
   // Debounced suggestion fetching
   useEffect(() => {
@@ -498,12 +479,9 @@ const SearchComponent: React.FC = () => {
                                 {orderedColumns.map((columnName, cellIndex) => {
                                   const cellValue = record.data[columnName] || '';
                                   
-                                  // Use the utility function to format RC numbers with dates
-                                  const formattedValue = formatRcWithDate(cellValue, columnName, rcDatesMap, record);
-                                  
                                   return (
                                     <td key={cellIndex} className="px-4 py-2 text-sm text-gray-200 border-b border-gray-700 min-w-[150px] max-w-[300px]">
-                                      {renderCellContent(formattedValue, columnName)}
+                                      {renderCellContent(cellValue, columnName)}
                                     </td>
                                   );
                                 })}
