@@ -466,9 +466,7 @@ const SearchComponent: React.FC = () => {
               {/* Expanded Data - ALL MATCHING RECORDS */}
               {expandedSheets.has(result.sheet_name) && (
                 <div className="bg-gray-800/20 p-4">
-                  <h4 className="text-md font-medium text-gray-300 mb-3">
-                    All Matching Records ({result.total_matches})
-                  </h4>
+                  
                   {result.records.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="min-w-full bg-gray-800/30 border border-gray-700 rounded-md table-fixed">
