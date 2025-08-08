@@ -3,6 +3,67 @@ import { pool } from '../index';
 
 const router = express.Router();
 
+// Helper function to get RC number to date mapping from "list of rc" sheet
+async function getRCDateMapping(): Promise<Map<string, string>> {
+  const rcDateMap = new Map<string, string>();
+  
+  try {
+    const rcLookupQuery = `
+      SELECT DISTINCT
+        COALESCE(
+          data->>'rc_number', 
+          data->>'rc', 
+          data->>'rc_no', 
+          data->>'reference_number',
+          data->>'RC_Number',
+          data->>'RC Number'
+        ) as rc_number,
+        data->>'Meeting_held_on_date' as meeting_date
+      FROM excel_data ed
+      JOIN excel_sheets s ON s.id = ed.sheet_id
+      WHERE (LOWER(s.sheet_name) LIKE '%list%rc%' 
+        OR LOWER(s.sheet_name) LIKE '%rc%list%'
+        OR LOWER(s.sheet_name) = 'list of rc'
+        OR LOWER(s.sheet_name) = 'list_of_rc')
+        AND (
+          data->>'rc_number' IS NOT NULL OR
+          data->>'rc' IS NOT NULL OR
+          data->>'rc_no' IS NOT NULL OR
+          data->>'reference_number' IS NOT NULL OR
+          data->>'RC_Number' IS NOT NULL OR
+          data->>'RC Number' IS NOT NULL
+        )
+        AND (
+          data->>'Meeting_held_on_date' IS NOT NULL
+        )
+    `;
+    
+    const result = await pool.query(rcLookupQuery);
+    
+    result.rows.forEach(row => {
+      const rcNum = row.rc_number;
+      const meetingDate = row.meeting_date;
+      if (rcNum && meetingDate) {
+        // Store both original RC number and just the numeric part for better matching
+        const cleanedRCNum = rcNum.toString().trim();
+        const numericRC = rcNum.replace(/[^\d]/g, '');
+        
+        rcDateMap.set(cleanedRCNum, meetingDate);
+        if (numericRC !== cleanedRCNum) {
+          rcDateMap.set(numericRC, meetingDate);
+        }
+      }
+    });
+    
+    console.log(`📅 Built RC date mapping with ${rcDateMap.size} entries`);
+    return rcDateMap;
+    
+  } catch (error) {
+    console.error('❌ Error building RC date mapping:', error);
+    return rcDateMap;
+  }
+}
+
 // GET /api/data/files - Get all uploaded files
 router.get('/files', async (req, res) => {
   try {
@@ -240,6 +301,9 @@ router.get('/search', async (req, res) => {
     
     let rcNumbers: string[] = [];
     
+    // Step 0: Get RC date mapping for all RC numbers
+    const rcDateMapping = await getRCDateMapping();
+    
     // Step 1: If date range is provided, get RC numbers from "list of rc" sheet
     if (dateFrom || dateTo) {
       console.log('🔍 Looking up RC numbers from "list of rc" sheet for date range...');
@@ -311,7 +375,8 @@ router.get('/search', async (req, res) => {
             data->>'rc', 
             data->>'rc_no', 
             data->>'reference_number',
-            data->>'RC_Number'
+            data->>'RC_Number',
+            data->>'RC Number'
           ) as rc_number,
           data->>'Meeting_held_on_date' as meeting_date
         FROM excel_data ed
@@ -326,7 +391,8 @@ router.get('/search', async (req, res) => {
             data->>'rc' IS NOT NULL OR
             data->>'rc_no' IS NOT NULL OR
             data->>'reference_number' IS NOT NULL OR
-            data->>'RC_Number' IS NOT NULL
+            data->>'RC_Number' IS NOT NULL OR
+            data->>'RC Number' IS NOT NULL
           )
       `;
       
@@ -398,6 +464,7 @@ router.get('/search', async (req, res) => {
           data->>'rc_no' ILIKE $${paramIndex} OR
           data->>'reference_number' ILIKE $${paramIndex} OR
           data->>'RC_Number' ILIKE $${paramIndex + 1} OR
+          data->>'RC Number' ILIKE $${paramIndex} OR
           data::text ILIKE $${paramIndex} OR
           data::text ILIKE $${paramIndex + 1}
         )`;
@@ -459,7 +526,8 @@ router.get('/search', async (req, res) => {
           data->>'rc', 
           data->>'rc_no', 
           data->>'reference_number',
-          data->>'RC_Number'
+          data->>'RC_Number',
+          data->>'RC Number'
         ) as rc_value
       FROM excel_data ed
       JOIN excel_sheets s ON s.id = ed.sheet_id
@@ -490,11 +558,26 @@ router.get('/search', async (req, res) => {
       
       // Only add if we haven't seen this record before
       if (!acc[sheetName].recordKeys.has(recordKey)) {
+        // Get RC date for this record
+        const rcValue = row.rc_value;
+        let rcDate = null;
+        
+        if (rcValue) {
+          // Try to find matching RC date
+          const cleanedRC = rcValue.toString().trim();
+          const numericRC = rcValue.toString().replace(/[^\d]/g, '');
+          
+          rcDate = rcDateMapping.get(cleanedRC) || 
+                   rcDateMapping.get(numericRC) || 
+                   null;
+        }
+        
         acc[sheetName].records.push({
           row_number: row.row_number,
           data: row.data,
           date_value: row.date_value,
-          rc_value: row.rc_value
+          rc_value: row.rc_value,
+          rc_date: rcDate
         });
         acc[sheetName].recordKeys.add(recordKey);
         acc[sheetName].total_matches++;

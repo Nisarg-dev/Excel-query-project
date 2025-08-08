@@ -16,7 +16,7 @@ interface SheetResult {
   title: string;
   headers: string[]; // Add headers to preserve column order
   total_matches: number;
-  records: Array<{ row_number: number; data: any; date_value?: string; rc_value?: string }>;
+  records: Array<{ row_number: number; data: any; date_value?: string; rc_value?: string; rc_date?: string }>;
   expanded?: boolean;
 }
 
@@ -448,11 +448,19 @@ const SearchComponent: React.FC = () => {
                               // Use the original column order from the Excel file
                               const orderedColumns = result.headers || Object.keys(result.records[0].data || {});
                               
-                              return orderedColumns.map((columnName, index) => (
-                                <th key={index} className="px-4 py-2 text-left text-sm font-medium text-gray-300 border-b border-gray-600 min-w-[150px] max-w-[300px]">
-                                  {columnName}
-                                </th>
-                              ));
+                              return (
+                                <>
+                                  {orderedColumns.map((columnName, index) => (
+                                    <th key={index} className="px-4 py-2 text-left text-sm font-medium text-gray-300 border-b border-gray-600 min-w-[150px] max-w-[300px]">
+                                      {columnName}
+                                    </th>
+                                  ))}
+                                  {/* Add RC Date column at the end */}
+                                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-300 border-b border-gray-600 min-w-[150px] max-w-[300px]">
+                                    RC Date
+                                  </th>
+                                </>
+                              );
                             })()}
                           </tr>
                         </thead>
@@ -481,6 +489,14 @@ const SearchComponent: React.FC = () => {
                                     </td>
                                   );
                                 })}
+                                {/* Add RC Date cell at the end */}
+                                <td className="px-4 py-2 text-sm text-gray-200 border-b border-gray-700 min-w-[150px] max-w-[300px]">
+                                  {record.rc_date ? (
+                                    <span className="text-green-400">{record.rc_date}</span>
+                                  ) : (
+                                    <span className="text-gray-500">-</span>
+                                  )}
+                                </td>
                               </tr>
                             );
                           })}
