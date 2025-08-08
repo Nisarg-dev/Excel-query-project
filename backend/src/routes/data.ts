@@ -202,37 +202,126 @@ router.get('/suggestions/companies', async (req, res) => {
       return res.json([]);
     }
 
+    // Much more comprehensive query that checks ALL possible company name variations
     const suggestionsQuery = `
-      SELECT DISTINCT
-        COALESCE(
+      WITH company_matches AS (
+        SELECT DISTINCT
+          COALESCE(
+            data->>'company_name',
+            data->>'company',
+            data->>'Company_Name',
+            data->>'Company Name',
+            data->>'Company name',
+            data->>'Name of the Applicant',
+            data->>'Applicant Name',
+            data->>'applicant_name',
+            data->>'firm_name',
+            data->>'Firm Name',
+            data->>'organization',
+            data->>'Organization',
+            data->>'name',
+            data->>'Name'
+          ) as company_name,
+          CASE 
+            WHEN COALESCE(
+              data->>'company_name',
+              data->>'company',
+              data->>'Company_Name',
+              data->>'Company Name',
+              data->>'Company name',
+              data->>'Name of the Applicant',
+              data->>'Applicant Name',
+              data->>'applicant_name',
+              data->>'firm_name',
+              data->>'Firm Name',
+              data->>'organization',
+              data->>'Organization',
+              data->>'name',
+              data->>'Name'
+            ) ILIKE $1 THEN 1  -- Starts with query (highest priority)
+            WHEN COALESCE(
+              data->>'company_name',
+              data->>'company',
+              data->>'Company_Name',
+              data->>'Company Name',
+              data->>'Company name',
+              data->>'Name of the Applicant',
+              data->>'Applicant Name',
+              data->>'applicant_name',
+              data->>'firm_name',
+              data->>'Firm Name',
+              data->>'organization',
+              data->>'Organization',
+              data->>'name',
+              data->>'Name'
+            ) ILIKE $2 THEN 2  -- Contains query (medium priority)
+            ELSE 3  -- Fallback
+          END as priority
+        FROM excel_data ed
+        WHERE (
+          data->>'company_name' ILIKE $2 OR
+          data->>'company' ILIKE $2 OR
+          data->>'Company_Name' ILIKE $2 OR
+          data->>'Company name' ILIKE $2 OR
+          data->>'Company Name' ILIKE $2 OR
+          data->>'Name of the Applicant' ILIKE $2 OR
+          data->>'Applicant Name' ILIKE $2 OR
+          data->>'applicant_name' ILIKE $2 OR
+          data->>'firm_name' ILIKE $2 OR
+          data->>'Firm Name' ILIKE $2 OR
+          data->>'organization' ILIKE $2 OR
+          data->>'Organization' ILIKE $2 OR
+          data->>'name' ILIKE $2 OR
+          data->>'Name' ILIKE $2
+        )
+        AND COALESCE(
           data->>'company_name',
           data->>'company',
           data->>'Company_Name',
-          data->>'Name of the Applicant'
-        ) as company_name
-      FROM excel_data ed
-      WHERE (
-        data->>'company_name' ILIKE $1 OR
-        data->>'company' ILIKE $1 OR
-        data->>'Company_Name' ILIKE $1 OR
-        data->>'Name of the Applicant' ILIKE $1
+          data->>'Company Name',
+          data->>'Company name',
+          data->>'Name of the Applicant',
+          data->>'Applicant Name',
+          data->>'applicant_name',
+          data->>'firm_name',
+          data->>'Firm Name',
+          data->>'organization',
+          data->>'Organization',
+          data->>'name',
+          data->>'Name'
+        ) IS NOT NULL
+        AND LENGTH(TRIM(COALESCE(
+          data->>'company_name',
+          data->>'company',
+          data->>'Company_Name',
+          data->>'Company Name',
+          data->>'Company name',
+          data->>'Name of the Applicant',
+          data->>'Applicant Name',
+          data->>'applicant_name',
+          data->>'firm_name',
+          data->>'Firm Name',
+          data->>'organization',
+          data->>'Organization',
+          data->>'name',
+          data->>'Name'
+        ))) > 2
       )
-      AND COALESCE(
-        data->>'company_name',
-        data->>'company',
-        data->>'Company_Name',
-        data->>'Name of the Applicant'
-      ) IS NOT NULL
-      ORDER BY company_name
-      LIMIT 10
+      SELECT company_name
+      FROM company_matches 
+      WHERE company_name IS NOT NULL
+      ORDER BY priority, LENGTH(company_name), company_name
+      LIMIT 50
     `;
 
-    const result = await pool.query(suggestionsQuery, [`${query}%`]);
+    const result = await pool.query(suggestionsQuery, [`${query}%`, `%${query}%`]);
     const suggestions = result.rows
       .map(row => row.company_name)
       .filter(name => name && name.toString().trim() !== '')
-      .map(name => name.toString().trim());
+      .map(name => name.toString().trim())
+      .filter((name, index, arr) => arr.indexOf(name) === index); // Remove duplicates
 
+    console.log(`🔍 Company suggestions for "${query}": found ${suggestions.length} matches`);
     res.json(suggestions);
   } catch (error) {
     console.error('❌ Error fetching company suggestions:', error);
@@ -249,44 +338,168 @@ router.get('/suggestions/products', async (req, res) => {
       return res.json([]);
     }
 
+    // Much more comprehensive query that checks ALL possible product name variations
     const suggestionsQuery = `
-      SELECT DISTINCT
-        COALESCE(
+      WITH product_matches AS (
+        SELECT DISTINCT
+          COALESCE(
+            data->>'product_name',
+            data->>'product',
+            data->>'Product_Name',
+            data->>'Product Name',
+            data->>'Name of the Product',
+            data->>'Product name',
+            data->>'item_name',
+            data->>'Item Name',
+            data->>'drug_name',
+            data->>'Drug Name',
+            data->>'medicine_name',
+            data->>'Medicine Name',
+            data->>'formulation',
+            data->>'Formulation',
+            data->>'description',
+            data->>'Description'
+          ) as product_name,
+          CASE 
+            WHEN COALESCE(
+              data->>'product_name',
+              data->>'product',
+              data->>'Product_Name',
+              data->>'Product Name',
+              data->>'Name of the Product',
+              data->>'Product name',
+              data->>'item_name',
+              data->>'Item Name',
+              data->>'drug_name',
+              data->>'Drug Name',
+              data->>'medicine_name',
+              data->>'Medicine Name',
+              data->>'formulation',
+              data->>'Formulation',
+              data->>'description',
+              data->>'Description'
+            ) ILIKE $1 THEN 1  -- Starts with query (highest priority)
+            WHEN COALESCE(
+              data->>'product_name',
+              data->>'product',
+              data->>'Product_Name',
+              data->>'Product Name',
+              data->>'Name of the Product',
+              data->>'Product name',
+              data->>'item_name',
+              data->>'Item Name',
+              data->>'drug_name',
+              data->>'Drug Name',
+              data->>'medicine_name',
+              data->>'Medicine Name',
+              data->>'formulation',
+              data->>'Formulation',
+              data->>'description',
+              data->>'Description'
+            ) ILIKE $2 THEN 2  -- Contains query (medium priority)
+            ELSE 3  -- Fallback
+          END as priority
+        FROM excel_data ed
+        WHERE (
+          data->>'product_name' ILIKE $2 OR
+          data->>'product' ILIKE $2 OR
+          data->>'Product_Name' ILIKE $2 OR
+          data->>'Product Name' ILIKE $2 OR
+          data->>'Name of the Product' ILIKE $2 OR
+          data->>'Product name' ILIKE $2 OR
+          data->>'item_name' ILIKE $2 OR
+          data->>'Item Name' ILIKE $2 OR
+          data->>'drug_name' ILIKE $2 OR
+          data->>'Drug Name' ILIKE $2 OR
+          data->>'medicine_name' ILIKE $2 OR
+          data->>'Medicine Name' ILIKE $2 OR
+          data->>'formulation' ILIKE $2 OR
+          data->>'Formulation' ILIKE $2 OR
+          data->>'description' ILIKE $2 OR
+          data->>'Description' ILIKE $2
+        )
+        AND COALESCE(
           data->>'product_name',
           data->>'product',
           data->>'Product_Name',
+          data->>'Product Name',
           data->>'Name of the Product',
-          data->>'Product name'
-        ) as product_name
-      FROM excel_data ed
-      WHERE (
-        data->>'product_name' ILIKE $1 OR
-        data->>'product' ILIKE $1 OR
-        data->>'Product_Name' ILIKE $1 OR
-        data->>'Name of the Product' ILIKE $1 OR
-        data->>'Product name' ILIKE $1
+          data->>'Product name',
+          data->>'item_name',
+          data->>'Item Name',
+          data->>'drug_name',
+          data->>'Drug Name',
+          data->>'medicine_name',
+          data->>'Medicine Name',
+          data->>'formulation',
+          data->>'Formulation',
+          data->>'description',
+          data->>'Description'
+        ) IS NOT NULL
+        AND LENGTH(TRIM(COALESCE(
+          data->>'product_name',
+          data->>'product',
+          data->>'Product_Name',
+          data->>'Product Name',
+          data->>'Name of the Product',
+          data->>'Product name',
+          data->>'item_name',
+          data->>'Item Name',
+          data->>'drug_name',
+          data->>'Drug Name',
+          data->>'medicine_name',
+          data->>'Medicine Name',
+          data->>'formulation',
+          data->>'Formulation',
+          data->>'description',
+          data->>'Description'
+        ))) > 2
       )
-      AND COALESCE(
-        data->>'product_name',
-        data->>'product',
-        data->>'Product_Name',
-        data->>'Name of the Product',
-        data->>'Product name'
-      ) IS NOT NULL
-      ORDER BY product_name
-      LIMIT 10
+      SELECT product_name
+      FROM product_matches 
+      WHERE product_name IS NOT NULL
+      ORDER BY priority, LENGTH(product_name), product_name
+      LIMIT 50
     `;
 
-    const result = await pool.query(suggestionsQuery, [`${query}%`]);
+    const result = await pool.query(suggestionsQuery, [`${query}%`, `%${query}%`]);
     const suggestions = result.rows
       .map(row => row.product_name)
       .filter(name => name && name.toString().trim() !== '')
-      .map(name => name.toString().trim());
+      .map(name => name.toString().trim())
+      .filter((name, index, arr) => arr.indexOf(name) === index); // Remove duplicates
 
+    console.log(`🔍 Product suggestions for "${query}": found ${suggestions.length} matches`);
     res.json(suggestions);
   } catch (error) {
     console.error('❌ Error fetching product suggestions:', error);
     res.status(500).json({ error: 'Failed to fetch product suggestions' });
+  }
+});
+
+// DEBUG: Investigate specific company matching issue
+router.get('/debug/company-search/:query', async (req, res) => {
+  try {
+    const query = req.params.query || '';
+    
+    // First, let's see ALL columns that contain the query term
+    const allColumnsQuery = `
+      SELECT DISTINCT data
+      FROM excel_data ed
+      WHERE data::text ILIKE '%${query}%'
+      LIMIT 20
+    `;
+
+    const result = await pool.query(allColumnsQuery);
+    
+    res.json({ 
+      query, 
+      total_matches: result.rows.length,
+      all_data_containing_query: result.rows
+    });
+  } catch (error) {
+    console.error('❌ Error in debug company search:', error);
+    res.status(500).json({ error: 'Debug failed' });
   }
 });
 
