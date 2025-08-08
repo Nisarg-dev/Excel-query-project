@@ -180,6 +180,36 @@ const SearchComponent: React.FC = () => {
   };
 
   // Helper function to truncate text and show read more
+  // Helper function to check if a column is an RC number column
+  const isRCNumberColumn = (columnName: string) => {
+    const rcColumnNames = ['RC_Number', 'RC Number', 'rc_number', 'rc', 'rc_no', 'reference_number'];
+    return rcColumnNames.includes(columnName);
+  };
+
+  // Helper function to get RC number value from record
+  const getRCNumberValue = (record: any) => {
+    const rcFields = ['RC_Number', 'RC Number', 'rc_number', 'rc', 'rc_no', 'reference_number'];
+    for (const field of rcFields) {
+      if (record.data[field]) {
+        return record.data[field];
+      }
+    }
+    return null;
+  };
+
+  // Helper function to format RC Number with date
+  const formatRCNumberWithDate = (record: any, columnName: string) => {
+    const rcNumber = record.data[columnName];
+    const rcDate = record.rc_date;
+    
+    if (rcNumber && rcDate) {
+      return `${rcNumber} (${rcDate})`;
+    } else if (rcNumber) {
+      return rcNumber;
+    }
+    return '';
+  };
+
   const truncateText = (text: string, maxLength: number = 100) => {
     if (!text || text.toString().length <= maxLength) {
       return text?.toString() || '';
@@ -448,19 +478,11 @@ const SearchComponent: React.FC = () => {
                               // Use the original column order from the Excel file
                               const orderedColumns = result.headers || Object.keys(result.records[0].data || {});
                               
-                              return (
-                                <>
-                                  {orderedColumns.map((columnName, index) => (
-                                    <th key={index} className="px-4 py-2 text-left text-sm font-medium text-gray-300 border-b border-gray-600 min-w-[150px] max-w-[300px]">
-                                      {columnName}
-                                    </th>
-                                  ))}
-                                  {/* Add RC Date column at the end */}
-                                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-300 border-b border-gray-600 min-w-[150px] max-w-[300px]">
-                                    RC Date
-                                  </th>
-                                </>
-                              );
+                              return orderedColumns.map((columnName, index) => (
+                                <th key={index} className="px-4 py-2 text-left text-sm font-medium text-gray-300 border-b border-gray-600 min-w-[150px] max-w-[300px]">
+                                  {isRCNumberColumn(columnName) ? 'RC Number (Date)' : columnName}
+                                </th>
+                              ));
                             })()}
                           </tr>
                         </thead>
@@ -476,12 +498,20 @@ const SearchComponent: React.FC = () => {
                               console.log('Original column order:', result.headers);
                               console.log('date_value:', record.date_value);
                               console.log('RC Number value:', record.data['RC Number']);
+                              console.log('rc_date:', record.rc_date);
                             }
                             
                             return (
                               <tr key={recordIndex} className={recordIndex % 2 === 0 ? 'bg-gray-800/20' : 'bg-gray-800/40'}>
                                 {orderedColumns.map((columnName, cellIndex) => {
-                                  const cellValue = record.data[columnName] || '';
+                                  let cellValue;
+                                  
+                                  // If this is an RC number column, combine it with the date
+                                  if (isRCNumberColumn(columnName)) {
+                                    cellValue = formatRCNumberWithDate(record, columnName);
+                                  } else {
+                                    cellValue = record.data[columnName] || '';
+                                  }
                                   
                                   return (
                                     <td key={cellIndex} className="px-4 py-2 text-sm text-gray-200 border-b border-gray-700 min-w-[150px] max-w-[300px]">
@@ -489,14 +519,6 @@ const SearchComponent: React.FC = () => {
                                     </td>
                                   );
                                 })}
-                                {/* Add RC Date cell at the end */}
-                                <td className="px-4 py-2 text-sm text-gray-200 border-b border-gray-700 min-w-[150px] max-w-[300px]">
-                                  {record.rc_date ? (
-                                    <span className="text-green-400">{record.rc_date}</span>
-                                  ) : (
-                                    <span className="text-gray-500">-</span>
-                                  )}
-                                </td>
                               </tr>
                             );
                           })}
