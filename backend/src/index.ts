@@ -18,24 +18,31 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Create uploads directory if it doesn't exist
+// Create uploads and pdf_storage directories if they don't exist
 import fs from 'fs';
 const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
+const pdfStorageDir = path.join(__dirname, '../pdf_storage');
+if (!fs.existsSync(pdfStorageDir)) {
+  fs.mkdirSync(pdfStorageDir, { recursive: true });
+}
 
 // PostgreSQL connection
-export const pool = new Pool({
-  // Support both DATABASE_URL (for Render) and individual variables (for local dev)
-  connectionString: process.env.DATABASE_URL,
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: String(process.env.DB_PASSWORD || ''),
-  port: parseInt(process.env.DB_PORT || '5432'),
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-});
+export const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    })
+  : new Pool({
+      user: process.env.DB_USER,
+      host: process.env.DB_HOST,
+      database: process.env.DB_NAME,
+      password: String(process.env.DB_PASSWORD || ''),
+      port: parseInt(process.env.DB_PORT || '5432'),
+      ssl: false
+    });
 
 // Test database connection
 pool.connect()
@@ -47,8 +54,11 @@ pool.connect()
     console.error('❌ Error connecting to PostgreSQL database:', err);
   });
 
+// Serve PDF files statically
+app.use('/pdfs', express.static(pdfStorageDir));
+
 // Routes
-app.use('/api/upload', uploadRoutes);
+app.use('/api', uploadRoutes);
 app.use('/api/data', dataRoutes);
 
 // Health check endpoint
