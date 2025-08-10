@@ -280,7 +280,6 @@ const SearchComponent: React.FC = () => {
   <div className="max-w-6xl mx-auto text-textPrimary">
       {/* Search Form */}
   <div className="bg-surface p-6 rounded-lg mb-8 border-2 border-primary/20 shadow-lg">
-  <h2 className="text-xl font-semibold text-textPrimary mb-4">Search All Records Across All Sheets</h2>
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div className="relative">
             <label htmlFor="company" className="block text-sm font-medium text-textPrimary mb-2">
