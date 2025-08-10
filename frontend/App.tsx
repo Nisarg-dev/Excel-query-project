@@ -16,8 +16,8 @@ function App() {
           <ExcelUpload />
         </div> */}
 
-        {/* PDF Upload Component */}
-        <PDFUpload />
+        {/* PDF Upload Component (hidden) */}
+        {/* <PDFUpload /> */}
 
         {/* Search Component */}
         <SearchComponent />
