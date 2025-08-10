@@ -458,9 +458,7 @@ const SearchComponent: React.FC = () => {
                   </span>
                 ))}
               </div>
-              <p className="text-textSecondary text-xs mt-2">
-                Showing all records matching these RC numbers across all sheets
-              </p>
+              
             </div>
           )}
         </div>
